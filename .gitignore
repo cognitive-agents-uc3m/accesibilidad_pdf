@@ -1,0 +1,8 @@
+# ── Archivos sensibles (nunca al repositorio) ──────────────────────────────
+.env
+
+# ── Archivos generados por Python ──────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo

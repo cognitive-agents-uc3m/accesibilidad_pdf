@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceso — Accesibilidad PDF UC3M</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  
+  <style>
+    .logo-imagen {
+        width: 225px;  /* Cambia este número si lo quieres más grande o más pequeño */
+        height: auto;
+        margin-right: 0px;
+    }
+    .login-logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+  </style>
+
+</head>
+<body class="pagina-login">
+
+  <main class="login-card">
+
+    <div class="login-logo" aria-label="Universidad Carlos III de Madrid">
+      <img src="/static/Logo_UC3M.png" alt="" class="logo-imagen">
+      <span class="logo-nombre">Universidad Carlos III<br>de Madrid</span>
+    </div>
+
+    <div class="login-divisor" aria-hidden="true"></div>
+
+    <div class="login-herramienta">
+      <h1>Accesibilidad PDF</h1>
+      <p>Conversión de material docente a HTML accesible para lectores de pantalla</p>
+    </div>
+
+    {% if error == "no_autorizado" %}
+    <div class="login-error" role="alert">
+      <strong>Acceso no autorizado.</strong> Tu cuenta no tiene permiso para usar esta herramienta.
+      Contacta con el administrador si crees que es un error.
+    </div>
+    {% elif error == "dominio" %}
+    <div class="login-error" role="alert">
+      <strong>Acceso restringido.</strong> Esta herramienta es exclusiva para la comunidad UC3M.
+      Debes acceder con una cuenta <code>@uc3m.es</code> o <code>@alumnos.uc3m.es</code>.
+    </div>
+    {% elif error == "oauth" %}
+    <div class="login-error" role="alert">
+      <strong>Error de autenticación.</strong> No se pudo completar el inicio de sesión. Inténtalo de nuevo.
+    </div>
+    {% endif %}
+
+    <a href="/auth/iniciar" class="btn-google" aria-label="Acceder con tu cuenta de Google UC3M">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Acceder con Google UC3M
+    </a>
+
+    <p class="login-nota">Solo se permiten cuentas <strong>@uc3m.es</strong> y <strong>@alumnos.uc3m.es</strong></p>
+
+  </main>
+
+  <footer class="login-footer">
+    <p>Departamento de Ingeniería Informática · UC3M</p>
+  </footer>
+
+</body>
+</html>

@@ -54,6 +54,12 @@ Reglas de estructura:
       <h2 id="id-del-h2">Título de la sección</h2>
     </section>
 - Jerarquía de encabezados sin saltos (h1 > h2 > h3, nunca h1 → h3).
+- El texto de cada encabezado debe describir el contenido de su sección. \
+  Encabezados genéricos como "Continuación", "Más información" u "Otros" están PROHIBIDOS: \
+  usa un resumen breve del contenido en su lugar.
+- El HTML generado debe ser válido: todas las etiquetas correctamente cerradas, \
+  atributos con valores entre comillas, sin atributos duplicados. \
+  Los lectores de pantalla dependen de un árbol DOM bien formado (WCAG 4.1.2).
 - PROHIBIDO elementos de presentación pura: <b>, <i>, <center>, <font>.
 - Elementos decorativos sin valor informativo (números de diapositiva, páginas, \
   iconos puramente visuales) deben llevar aria-hidden="true".
@@ -64,6 +70,17 @@ Reglas de estructura:
   en el elemento que lo contiene: <span lang="en">software engineering</span>. \
   Aplica a términos técnicos en inglés, expresiones latinas o cualquier otro idioma.
 </estructura>
+
+<secuencia>
+- Si el PDF tiene columnas paralelas (dos o más bloques de texto en horizontal), \
+  aplánalos en un único flujo lineal que siga el orden lógico de lectura \
+  (generalmente: columna izquierda completa, luego columna derecha; o fila a fila si es una tabla de conceptos).
+- NUNCA uses CSS (flex, grid, float) para replicar la disposición visual de columnas paralelas \
+  del PDF. El HTML debe leerse de arriba a abajo en el orden correcto sin navegación visual.
+- Sidebars, recuadros laterales y notas al margen se insertan en el flujo principal \
+  en el punto donde aparecen: dentro de <aside> si son complementarios, \
+  o dentro de <section> si forman parte del contenido principal.
+</secuencia>
 
 <navegacion>
 - Si el documento incluye un índice o tabla de contenidos, cada entrada activa o \
@@ -91,6 +108,10 @@ Reglas de estructura:
 - Si la imagen es decorativa o ilegible, incluye dentro del <figure> un \
   <p class="nota-accesibilidad"> explicando el motivo, antes del <figcaption>.
 - Las fórmulas matemáticas se representan en MathML o en texto descriptivo legible.
+- Si excepcionalmente se genera un <img> (imagen real del PDF que no puede representarse \
+  como texto), incluye siempre el atributo alt: alt="[descripción concisa del contenido]" \
+  para imágenes informativas, o alt="" para imágenes puramente decorativas. \
+  Nunca omitas el atributo alt (WCAG 1.1.1).
 </imagenes>
 
 <listas>
@@ -102,8 +123,21 @@ Reglas de estructura:
 </listas>
 
 <estilos>
-- PROHIBIDO el atributo style="" directamente en elementos HTML. \
-  Todos los estilos van en <style> dentro del <head>.
+- PROHIBIDO el atributo style="" en cualquier elemento HTML, sin excepción. \
+  Esto incluye display, flex, margin, padding, text-align, vertical-align, \
+  color, font-weight, top, left, position y width. \
+  Todos los estilos van exclusivamente en el bloque <style> del <head> como clases CSS con nombre descriptivo. \
+  El bloque <style> contiene ÚNICAMENTE reglas CSS válidas, nunca texto explicativo ni comentarios en prosa.
+- Para los layouts más frecuentes define y usa estas clases en <style>:
+    .fila         { display: flex; align-items: center; gap: 1rem; }
+    .fila-top     { display: flex; align-items: flex-start; gap: 1rem; }
+    .figura-inline{ display: inline-block; vertical-align: top; }
+    .centrado     { text-align: center; }
+  Si necesitas una variante puntual, crea una clase descriptiva (.margen-izq, .fila-envuelta, etc.), \
+  nunca uses style="".
+- PROHIBIDO añadir etiquetas <script> ni referencias a recursos externos (CDN, MathJax, fuentes web, \
+  hojas de estilo externas). El documento debe ser completamente autocontenido y funcionar sin conexión a internet. \
+  Las fórmulas matemáticas se representan en MathML nativo o en texto descriptivo, nunca con librerías externas.
 - PROHIBIDO usar el color como único indicador de información. \
   Añade siempre un indicador textual explícito, por ejemplo:
     <li><strong>(Correcta)</strong> Texto de la opción</li>
@@ -112,6 +146,9 @@ Reglas de estructura:
   y 3:1 para texto grande (≥18pt o ≥14pt en negrita).
 - Usa unidades relativas (rem o em) para tamaños de fuente en el CSS generado. \
   PROHIBIDO fijar tamaños de texto con px.
+- PROHIBIDO fijar anchos absolutos en px para contenedores, tablas o figuras. \
+  Usa max-width: 100% en tablas, figuras e imágenes para que el contenido sea \
+  responsive y no fuerce scroll horizontal al hacer zoom (WCAG 1.4.10 Reflow).
 </estilos>
 
 <examenes>

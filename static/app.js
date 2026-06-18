@@ -386,12 +386,13 @@ form.addEventListener('submit', async e => {
 
 /* ── Acciones del resultado ───────────────────────────────────────────────── */
 document.getElementById('btn-descargar').addEventListener('click', () => {
-  const nombre = (selectAsignatura.value || 'documento').toLowerCase() + '_accesible.html';
+  const nombre = (selectAsignatura.value || 'documento').toLowerCase();
   const blob = new Blob([htmlActual], { type: 'text/html' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = nombre;
+  a.download = nombre + '_accesible.html';
   a.click();
+  URL.revokeObjectURL(a.href);
 });
 
 document.getElementById('btn-copiar').addEventListener('click', async () => {

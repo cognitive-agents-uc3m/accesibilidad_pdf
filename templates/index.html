@@ -204,6 +204,12 @@
               </svg>
               Copiar código
             </button>
+            <button type="button" id="btn-auditar" class="btn-accion btn-secundario">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+              </svg>
+              Auditar WCAG
+            </button>
             <button type="button" id="btn-nueva-conversion" class="btn-accion btn-texto">
               Nueva conversión
             </button>
@@ -212,6 +218,7 @@
           <div class="pestanas" role="tablist" aria-label="Vistas del resultado">
             <button role="tab" class="pestana activa" id="tab-preview" aria-controls="panel-preview" aria-selected="true">Vista previa</button>
             <button role="tab" class="pestana" id="tab-codigo" aria-controls="panel-codigo" aria-selected="false">HTML</button>
+            <button role="tab" class="pestana" id="tab-auditoria" aria-controls="panel-auditoria" aria-selected="false">Auditoría WCAG</button>
           </div>
 
           <div id="panel-preview" role="tabpanel" aria-labelledby="tab-preview">
@@ -220,6 +227,11 @@
           <div id="panel-codigo" role="tabpanel" aria-labelledby="tab-codigo" hidden>
             <label for="textarea-html" class="sr-only">Código HTML generado</label>
             <textarea id="textarea-html" readonly spellcheck="false" aria-label="Código HTML generado"></textarea>
+          </div>
+          <div id="panel-auditoria" role="tabpanel" aria-labelledby="tab-auditoria" hidden>
+            <div id="auditoria-contenido" class="auditoria-contenido">
+              <p class="auditoria-placeholder">Pulsa "Auditar WCAG" para analizar el documento generado.</p>
+            </div>
           </div>
         </section>
 

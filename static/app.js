@@ -404,6 +404,70 @@ document.getElementById('btn-copiar').addEventListener('click', async () => {
   }, 2000);
 });
 
+document.getElementById('btn-auditar').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-auditar');
+  btn.disabled = true;
+  btn.textContent = 'Auditando…';
+  activarTab('tab-auditoria');
+
+  const contenido = document.getElementById('auditoria-contenido');
+  contenido.innerHTML = '<p class="auditoria-placeholder">Analizando el documento…</p>';
+
+  try {
+    const fd = new FormData();
+    fd.append('html', htmlActual);
+    const resp = await fetch('/api/auditar-accesibilidad', { method: 'POST', body: fd });
+    if (resp.status === 401) { window.location.href = '/login'; return; }
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      contenido.innerHTML = `<p class="auditoria-error">${data.detail || 'Error al auditar.'}</p>`;
+      return;
+    }
+
+    const { violations, passes } = data;
+    const impactoLabel = { critical: 'Crítico', serious: 'Grave', moderate: 'Moderado', minor: 'Menor' };
+    const impactoClase = { critical: 'impacto-critical', serious: 'impacto-serious', moderate: 'impacto-moderate', minor: 'impacto-minor' };
+
+    if (violations.length === 0) {
+      contenido.innerHTML = `
+        <div class="auditoria-ok">
+          <p>✓ Sin violaciones detectadas. ${passes} criterios superados.</p>
+        </div>`;
+      return;
+    }
+
+    const resumen = ['critical', 'serious', 'moderate', 'minor'].map(imp => {
+      const n = violations.filter(v => v.impact === imp).length;
+      return n > 0 ? `<span class="resumen-badge ${impactoClase[imp]}">${impactoLabel[imp]}: ${n}</span>` : '';
+    }).join('');
+
+    const lista = violations.map(v => `
+      <li class="violacion-item">
+        <div class="violacion-cabecera">
+          <span class="violacion-badge ${impactoClase[v.impact]}">${impactoLabel[v.impact] || v.impact}</span>
+          <code class="violacion-id">${v.id}</code>
+          <span class="violacion-nodos">${v.nodos} elemento${v.nodos !== 1 ? 's' : ''}</span>
+        </div>
+        <p class="violacion-desc">${v.help}</p>
+        <a class="violacion-link" href="${v.helpUrl}" target="_blank" rel="noopener">Ver criterio WCAG</a>
+      </li>`).join('');
+
+    contenido.innerHTML = `
+      <div class="auditoria-resumen">
+        <strong>${violations.length} violación${violations.length !== 1 ? 'es' : ''}</strong> · ${passes} criterios superados
+        <div class="resumen-badges">${resumen}</div>
+      </div>
+      <ul class="violaciones-lista">${lista}</ul>`;
+
+  } catch (err) {
+    contenido.innerHTML = `<p class="auditoria-error">Error de conexión: ${err.message}</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg> Auditar WCAG`;
+  }
+});
+
 document.getElementById('btn-nueva-conversion').addEventListener('click', () => {
   form.reset();
   archivoElegido.hidden = true;
@@ -416,22 +480,23 @@ document.getElementById('btn-nueva-conversion').addEventListener('click', () => 
 });
 
 /* ── Pestañas ─────────────────────────────────────────────────────────────── */
-document.getElementById('tab-preview').addEventListener('click', () => {
-  document.getElementById('tab-preview').classList.add('activa');
-  document.getElementById('tab-preview').setAttribute('aria-selected', 'true');
-  document.getElementById('tab-codigo').classList.remove('activa');
-  document.getElementById('tab-codigo').setAttribute('aria-selected', 'false');
-  document.getElementById('panel-preview').hidden = false;
-  document.getElementById('panel-codigo').hidden = true;
-});
+const TABS = [
+  { tab: 'tab-preview',   panel: 'panel-preview' },
+  { tab: 'tab-codigo',    panel: 'panel-codigo' },
+  { tab: 'tab-auditoria', panel: 'panel-auditoria' },
+];
 
-document.getElementById('tab-codigo').addEventListener('click', () => {
-  document.getElementById('tab-codigo').classList.add('activa');
-  document.getElementById('tab-codigo').setAttribute('aria-selected', 'true');
-  document.getElementById('tab-preview').classList.remove('activa');
-  document.getElementById('tab-preview').setAttribute('aria-selected', 'false');
-  document.getElementById('panel-codigo').hidden = false;
-  document.getElementById('panel-preview').hidden = true;
+function activarTab(idTab) {
+  TABS.forEach(({ tab, panel }) => {
+    const esActiva = tab === idTab;
+    document.getElementById(tab).classList.toggle('activa', esActiva);
+    document.getElementById(tab).setAttribute('aria-selected', String(esActiva));
+    document.getElementById(panel).hidden = !esActiva;
+  });
+}
+
+TABS.forEach(({ tab }) => {
+  document.getElementById(tab).addEventListener('click', () => activarTab(tab));
 });
 
 /* ── Navegación de teclado en pestañas (ARIA tablist pattern) ─────────────── */

@@ -1040,3 +1040,28 @@ body.pagina-login {
   border: 0;
 }
 [hidden] { display: none !important; }
+
+/* ── Auditoría WCAG ───────────────────────────────────────────────────────── */
+.auditoria-contenido { padding: 1rem 0; }
+.auditoria-placeholder { color: var(--texto-tenue, #6b7280); font-size: .9rem; }
+.auditoria-error { color: #dc2626; font-size: .9rem; }
+
+.auditoria-ok { background: #f0fdf4; border: 1px solid #86efac; border-radius: .5rem; padding: 1rem; color: #166534; }
+
+.auditoria-resumen { margin-bottom: 1rem; font-size: .9rem; }
+.resumen-badges { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+.resumen-badge { padding: .2rem .6rem; border-radius: 9999px; font-size: .75rem; font-weight: 600; color: #fff; }
+
+.violaciones-lista { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .75rem; }
+.violacion-item { border: 1px solid #e5e7eb; border-radius: .5rem; padding: .75rem 1rem; }
+.violacion-cabecera { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .4rem; }
+.violacion-badge { padding: .15rem .5rem; border-radius: 9999px; font-size: .7rem; font-weight: 700; color: #fff; }
+.violacion-id { font-size: .8rem; background: #f3f4f6; padding: .1rem .4rem; border-radius: .25rem; }
+.violacion-nodos { font-size: .75rem; color: #6b7280; margin-left: auto; }
+.violacion-desc { font-size: .85rem; margin: 0 0 .4rem; }
+.violacion-link { font-size: .8rem; color: var(--azul, #1d4ed8); }
+
+.impacto-critical { background: #dc2626; }
+.impacto-serious  { background: #ea580c; }
+.impacto-moderate { background: #ca8a04; }
+.impacto-minor    { background: #2563eb; }

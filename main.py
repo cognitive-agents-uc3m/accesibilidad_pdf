@@ -379,6 +379,51 @@ async def convertir(
         os.unlink(tmp_path)
 
 
+def _ejecutar_auditoria(html: str) -> dict:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise RuntimeError("Playwright no instalado. Ejecuta: pip install playwright && playwright install chromium")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(html, wait_until="domcontentloaded")
+        page.add_script_tag(url="https://cdn.jsdelivr.net/npm/axe-core/axe.min.js")
+        results = page.evaluate("axe.run()")
+        browser.close()
+    return results
+
+
+@app.post("/api/auditar-accesibilidad")
+async def auditar_accesibilidad(
+    html: str = Form(...),
+    _user: dict = Depends(sesion_activa),
+):
+    import asyncio
+    try:
+        results = await asyncio.to_thread(_ejecutar_auditoria, html)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+
+    violations = [
+        {
+            "id": v["id"],
+            "impact": v["impact"],
+            "description": v["description"],
+            "help": v["help"],
+            "helpUrl": v["helpUrl"],
+            "nodos": len(v["nodes"]),
+        }
+        for v in results.get("violations", [])
+    ]
+
+    return JSONResponse({
+        "violations": violations,
+        "passes": len(results.get("passes", [])),
+    })
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

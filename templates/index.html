@@ -115,7 +115,9 @@
             <label for="modelo" class="campo-label">Modelo Gemini</label>
             <select id="modelo" name="modelo" class="campo-select">
               <option value="gemini-2.5-flash" selected>gemini-2.5-flash — Recomendado</option>
+              <option value="gemini-3.5-flash">gemini-3.5-flash — Más reciente</option>
               <option value="gemini-2.5-pro">gemini-2.5-pro — Mayor calidad, más lento</option>
+              <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview — Preview avanzado</option>
               <option value="gemini-2.0-flash">gemini-2.0-flash — Más rápido</option>
             </select>
           </div>
@@ -137,7 +139,7 @@
             <h2 class="skills-titulo">Instrucciones activas</h2>
             <span id="skills-asig-nombre" class="skills-badge"></span>
             <button type="button" id="btn-verificar-compat" class="btn-verificar-compat"
-                    title="Verificar compatibilidad entre todas las instrucciones activas">
+                    aria-label="Verificar compatibilidad entre todas las instrucciones activas">
               Verificar
             </button>
           </div>
@@ -191,6 +193,7 @@
             <span id="nombre-resultado" class="resultado-asignatura"></span>
           </div>
 
+          <span id="aviso-copiado" aria-live="polite" class="sr-only"></span>
           <div class="acciones-resultado" role="group" aria-label="Acciones">
             <button type="button" id="btn-descargar" class="btn-accion btn-primario">
               <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -222,6 +225,7 @@
           </div>
 
           <div id="panel-preview" role="tabpanel" aria-labelledby="tab-preview">
+            <p class="sr-only">Vista previa visual del documento generado. Para acceder al contenido usa los botones Descargar HTML o Copiar código situados arriba.</p>
             <iframe id="iframe-preview" title="Vista previa del HTML accesible generado" sandbox="allow-same-origin"></iframe>
           </div>
           <div id="panel-codigo" role="tabpanel" aria-labelledby="tab-codigo" hidden>

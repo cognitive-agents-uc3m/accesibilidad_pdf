@@ -16,6 +16,11 @@ const panelCompat = document.getElementById('panel-compat');
 /* ── Skills personalizadas ────────────────────────────────────────────────── */
 const customSkills = new Map(); // id → texto
 let customSkillNextId = 0;
+const STORAGE_KEY = 'accesibilidad-custom-skills';
+
+function guardarCustomSkills() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...customSkills.values()]));
+}
 
 btnAnadirSkill.addEventListener('click', () => {
   formSkillCustom.hidden = false;
@@ -42,12 +47,8 @@ textareaSkillCustom.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.getElementById('btn-cancelar-skill').click();
 });
 
-function añadirSkillPersonalizada(texto) {
-  const id = customSkillNextId++;
-  customSkills.set(id, texto);
-
+function _crearElementoCustomSkill(id, texto) {
   const preview = texto.length > 120 ? texto.slice(0, 120) + '…' : texto;
-
   const div = document.createElement('div');
   div.className = 'skill-seccion skill-custom';
   div.dataset.customId = id;
@@ -67,11 +68,35 @@ function añadirSkillPersonalizada(texto) {
 
   div.querySelector('.btn-borrar-skill').addEventListener('click', () => {
     customSkills.delete(id);
+    guardarCustomSkills();
     div.remove();
   });
 
+  return div;
+}
+
+function añadirSkillPersonalizada(texto) {
+  const id = customSkillNextId++;
+  customSkills.set(id, texto);
+  guardarCustomSkills();
+  const div = _crearElementoCustomSkill(id, texto);
   skillsContenido.appendChild(div);
   div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function _restaurarCustomSkillsEnDOM() {
+  for (const [id, texto] of customSkills) {
+    skillsContenido.appendChild(_crearElementoCustomSkill(id, texto));
+  }
+}
+
+function restaurarCustomSkills() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    const textos = JSON.parse(saved);
+    if (Array.isArray(textos)) textos.forEach(t => { customSkills.set(customSkillNextId++, t); });
+  } catch { }
 }
 
 function obtenerSkillsCustomActivos() {
@@ -114,8 +139,6 @@ function desactivarInstruccion(fuente) {
 }
 
 function resetearCustomSkills() {
-  customSkills.clear();
-  customSkillNextId = 0;
   formSkillCustom.hidden = true;
   btnAnadirSkill.hidden = false;
   textareaSkillCustom.value = '';
@@ -245,6 +268,8 @@ async function cargarSkills(codigo, nombre) {
     });
   } catch {
     skillsContenido.innerHTML = '<p class="skills-vacio">No se pudieron cargar las instrucciones.</p>';
+  } finally {
+    _restaurarCustomSkillsEnDOM();
   }
 }
 
@@ -447,7 +472,7 @@ document.getElementById('btn-auditar').addEventListener('click', async () => {
           <code class="violacion-id">${v.id}</code>
           <span class="violacion-nodos">${v.nodos} elemento${v.nodos !== 1 ? 's' : ''}</span>
         </div>
-        <p class="violacion-desc">${v.help}</p>
+        <p class="violacion-desc">${esc(v.help)}</p>
         <a class="violacion-link" href="${v.helpUrl}" target="_blank" rel="noopener">Ver criterio WCAG</a>
       </li>`).join('');
 
@@ -495,6 +520,178 @@ function activarTab(idTab) {
 
 TABS.forEach(({ tab }) => {
   document.getElementById(tab).addEventListener('click', () => activarTab(tab));
+});
+
+restaurarCustomSkills();
+
+/* ── Historial ────────────────────────────────────────────────────────────── */
+let historialGrupos = [];
+let historialAsigActual = null;
+let historialItemActual = null;
+
+function formatearFecha(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+async function cargarHistorial() {
+  const lista = document.getElementById('historial-asig-lista');
+  lista.innerHTML = '<p class="historial-cargando">Cargando…</p>';
+  try {
+    const resp = await fetch('/api/historial');
+    if (resp.status === 401) { window.location.href = '/login'; return; }
+    const data = await resp.json();
+    historialGrupos = data.grupos || [];
+    renderizarSidebar();
+  } catch (err) {
+    lista.innerHTML = `<p class="historial-cargando">Error al cargar: ${esc(err.message)}</p>`;
+  }
+}
+
+function renderizarSidebar() {
+  const lista = document.getElementById('historial-asig-lista');
+  if (!historialGrupos.length) {
+    lista.innerHTML = '<p class="historial-cargando">Aún no hay contenido generado.</p>';
+    return;
+  }
+  lista.innerHTML = historialGrupos.map(g => `
+    <button class="historial-asig-item${historialAsigActual === g.asignatura ? ' activa' : ''}"
+            data-asig="${esc(g.asignatura)}" aria-pressed="${historialAsigActual === g.asignatura}">
+      <span class="historial-asig-nombre">${esc(g.nombre_asig)}</span>
+      <span class="historial-asig-badge">${g.items.length}</span>
+    </button>`).join('');
+  lista.querySelectorAll('.historial-asig-item').forEach(btn => {
+    btn.addEventListener('click', () => seleccionarAsignatura(btn.dataset.asig));
+  });
+}
+
+function seleccionarAsignatura(asig) {
+  historialAsigActual = asig;
+  historialItemActual = null;
+  renderizarSidebar();
+  mostrarVistaHistorial('lista');
+  const grupo = historialGrupos.find(g => g.asignatura === asig);
+  if (!grupo) return;
+  document.getElementById('historial-lista-titulo').textContent = grupo.nombre_asig;
+  document.getElementById('historial-lista-count').textContent =
+    `${grupo.items.length} documento${grupo.items.length !== 1 ? 's' : ''}`;
+  const ul = document.getElementById('historial-docs');
+  ul.innerHTML = grupo.items.map(item => `
+    <li class="historial-doc-card">
+      <div class="historial-doc-info">
+        <p class="historial-doc-nombre">${esc(item.pdf_nombre || 'Documento')}</p>
+        <p class="historial-doc-meta">
+          <span>${formatearFecha(item.fecha)}</span>
+          <span>${esc(item.modelo || '')}</span>
+          <span>${esc(item.usuario || '')}</span>
+        </p>
+      </div>
+      <div class="historial-doc-acciones">
+        <button class="btn-ver-doc" data-id="${esc(item.id)}" data-asig="${esc(item.asignatura)}"
+                data-nombre="${esc(item.pdf_nombre || 'Documento')}">
+          Ver
+        </button>
+        <button class="btn-borrar-doc" data-id="${esc(item.id)}" data-asig="${esc(item.asignatura)}"
+                aria-label="Eliminar ${esc(item.pdf_nombre || 'documento')}">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
+          </svg>
+        </button>
+      </div>
+    </li>`).join('');
+  ul.querySelectorAll('.btn-ver-doc').forEach(btn => {
+    btn.addEventListener('click', () => verDocumento(btn.dataset.asig, btn.dataset.id, btn.dataset.nombre));
+  });
+  ul.querySelectorAll('.btn-borrar-doc').forEach(btn => {
+    btn.addEventListener('click', () => eliminarDocumento(btn.dataset.asig, btn.dataset.id, btn.closest('li')));
+  });
+}
+
+async function verDocumento(asig, id, nombre) {
+  historialItemActual = { asig, id, nombre };
+  mostrarVistaHistorial('visor');
+  document.getElementById('historial-visor-titulo').textContent = nombre;
+  const iframe = document.getElementById('historial-iframe');
+  iframe.src = '';
+  try {
+    const resp = await fetch(`/api/historial/${encodeURIComponent(asig)}/${encodeURIComponent(id)}`);
+    if (!resp.ok) throw new Error('No encontrado');
+    const { html } = await resp.json();
+    const blob = new Blob([html], { type: 'text/html' });
+    iframe.src = URL.createObjectURL(blob);
+    document.getElementById('historial-btn-descargar').onclick = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = nombre.replace(/\.pdf$/i, '') + '_accesible.html';
+      a.click();
+    };
+  } catch (err) {
+    iframe.srcdoc = `<p style="padding:2rem;color:red">Error al cargar: ${esc(err.message)}</p>`;
+  }
+}
+
+async function eliminarDocumento(asig, id, cardEl) {
+  if (!confirm('¿Eliminar este documento del historial?')) return;
+  try {
+    const resp = await fetch(
+      `/api/historial/${encodeURIComponent(asig)}/${encodeURIComponent(id)}`,
+      { method: 'DELETE' }
+    );
+    if (!resp.ok) throw new Error('Error al eliminar');
+    cardEl.remove();
+    const grupo = historialGrupos.find(g => g.asignatura === asig);
+    if (grupo) {
+      grupo.items = grupo.items.filter(i => i.id !== id);
+      if (!grupo.items.length) {
+        historialGrupos = historialGrupos.filter(g => g.asignatura !== asig);
+        historialAsigActual = null;
+        mostrarVistaHistorial('placeholder');
+      } else {
+        document.getElementById('historial-lista-count').textContent =
+          `${grupo.items.length} documento${grupo.items.length !== 1 ? 's' : ''}`;
+      }
+      renderizarSidebar();
+    }
+  } catch (err) {
+    alert('No se pudo eliminar: ' + err.message);
+  }
+}
+
+function mostrarVistaHistorial(sub) {
+  document.getElementById('historial-placeholder').hidden = sub !== 'placeholder';
+  document.getElementById('historial-lista').hidden = sub !== 'lista';
+  document.getElementById('historial-visor').hidden = sub !== 'visor';
+}
+
+document.getElementById('historial-btn-volver').addEventListener('click', () => {
+  if (historialAsigActual) seleccionarAsignatura(historialAsigActual);
+  else mostrarVistaHistorial('placeholder');
+});
+
+/* ── Cambio de vista principal ────────────────────────────────────────────── */
+const vistaConvertir  = document.getElementById('vista-convertir');
+const vistaHistorial  = document.getElementById('vista-historial');
+const btnConvertirTab = document.getElementById('btn-vista-convertir');
+const btnHistorialTab = document.getElementById('btn-vista-historial');
+
+btnConvertirTab.addEventListener('click', () => {
+  vistaConvertir.hidden = false;
+  vistaHistorial.hidden = true;
+  btnConvertirTab.classList.add('activa');
+  btnConvertirTab.setAttribute('aria-pressed', 'true');
+  btnHistorialTab.classList.remove('activa');
+  btnHistorialTab.setAttribute('aria-pressed', 'false');
+});
+
+btnHistorialTab.addEventListener('click', () => {
+  vistaHistorial.hidden = false;
+  vistaConvertir.hidden = true;
+  btnHistorialTab.classList.add('activa');
+  btnHistorialTab.setAttribute('aria-pressed', 'true');
+  btnConvertirTab.classList.remove('activa');
+  btnConvertirTab.setAttribute('aria-pressed', 'false');
+  if (!historialGrupos.length) cargarHistorial();
 });
 
 /* ── Navegación de teclado en pestañas (ARIA tablist pattern) ─────────────── */

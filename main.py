@@ -1,8 +1,13 @@
+import asyncio
 import json
 import logging
 import os
 import re
 import tempfile
+import uuid as _uuid
+from datetime import datetime, timezone
+
+from google.cloud import storage as _gcs
 
 from dotenv import load_dotenv
 from rich.logging import RichHandler
@@ -22,9 +27,10 @@ load_dotenv()
 
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "uc3m-inf-dei-accessmllm")
 LOCATION   = os.getenv("GCP_LOCATION", "global")
+GCS_BUCKET = os.getenv("GCS_BUCKET", "")
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
 
 # Correos autorizados. Si la variable está vacía, se permite cualquier cuenta.
@@ -140,6 +146,11 @@ y detecta únicamente contradicciones directas o conflictos claros entre instruc
 Sé muy conservador: no reportes solapamientos semánticos ni especializaciones, \
 solo conflictos reales donde dos instrucciones pidan cosas opuestas o incompatibles.
 
+IMPORTANTE: Solo reporta contradicciones ENTRE fuentes distintas (por ejemplo, entre un SKILL \
+y BASE_PROMPT, o entre dos SKILLs, o entre una PERSONALIZADA y BASE_PROMPT). \
+NUNCA reportes contradicciones internas dentro del propio BASE_PROMPT. \
+Si ambas fuentes de una contradicción serían BASE_PROMPT, descarta esa contradicción.
+
 <instrucciones_a_revisar>
 {instrucciones}
 </instrucciones_a_revisar>
@@ -180,8 +191,14 @@ def _parsear_skills(texto: str) -> list[dict]:
         elif seccion_actual is not None:
             lineas_actuales.append(linea)
             stripped = linea.lstrip()
+            num_match = re.match(r"^(\d+)\.\s+(.*)", stripped)
             if stripped.startswith("- "):
                 item = re.sub(r"`([^`]+)`", r"\1", stripped[2:].strip())
+                item = re.sub(r"\*\*([^*]+)\*\*", r"\1", item)
+                seccion_actual["items"].append(item)
+            elif num_match:
+                item = re.sub(r"`([^`]+)`", r"\1", num_match.group(2).strip())
+                item = re.sub(r"\*\*([^*]+)\*\*", r"\1", item)
                 seccion_actual["items"].append(item)
             elif linea.startswith("  ") and seccion_actual["items"]:
                 continuation = re.sub(r"`([^`]+)`", r"\1", linea.strip())
@@ -244,9 +261,16 @@ async def check_contradicciones(
         raw = re.sub(r"^```(?:json)?\n?", "", raw)
         raw = re.sub(r"\n?```$", "", raw)
         resultado = json.loads(raw)
+        contradicciones = [
+            c for c in resultado.get("contradicciones", [])
+            if not (c.get("fuente_a") == "BASE_PROMPT" and c.get("fuente_b") == "BASE_PROMPT")
+        ]
+        resultado["contradicciones"] = contradicciones
+        if not contradicciones:
+            resultado["compatible"] = True
         log.info("Compatibilidad %s: compatible=%s, conflictos=%d",
                  asignatura, resultado.get("compatible"),
-                 len(resultado.get("contradicciones", [])))
+                 len(contradicciones))
         return JSONResponse(resultado)
     except json.JSONDecodeError:
         log.warning("Respuesta de check-contradicciones no es JSON válido")
@@ -342,6 +366,7 @@ async def convertir(
                 types.Part.from_bytes(data=datos_pdf, mime_type="application/pdf"),
                 prompt,
             ],
+            config=types.GenerateContentConfig(max_output_tokens=65536),
         )
 
         # --- 💰 CÁLCULO DE COSTE AÑADIDO AQUÍ ---
@@ -367,6 +392,11 @@ async def convertir(
 
         html = _limpiar_html(response.text or "")
         log.info("✓ HTML generado — %d chars", len(html))
+
+        await asyncio.to_thread(
+            _guardar_conversion_gcs,
+            asignatura, asig["nombre"], nombre_archivo, modelo, user["email"], html,
+        )
 
         return JSONResponse({"html": html, "asignatura": asignatura, "nombre": asig["nombre"]})
 
@@ -422,6 +452,101 @@ async def auditar_accesibilidad(
         "violations": violations,
         "passes": len(results.get("passes", [])),
     })
+
+
+def _guardar_conversion_gcs(
+    asignatura: str, nombre_asig: str, pdf_nombre: str,
+    modelo: str, usuario: str, html: str,
+) -> None:
+    if not GCS_BUCKET:
+        return
+    try:
+        item_id = _uuid.uuid4().hex[:12]
+        fecha = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        meta = json.dumps({
+            "id": item_id, "asignatura": asignatura, "nombre_asig": nombre_asig,
+            "pdf_nombre": pdf_nombre, "modelo": modelo, "fecha": fecha, "usuario": usuario,
+        }, ensure_ascii=False)
+        bucket = _gcs.Client().bucket(GCS_BUCKET)
+        bucket.blob(f"meta/{asignatura}/{item_id}.json").upload_from_string(
+            meta, content_type="application/json"
+        )
+        bucket.blob(f"html/{asignatura}/{item_id}.html").upload_from_string(
+            html, content_type="text/html; charset=utf-8"
+        )
+        log.info("Guardado en GCS: %s/%s", asignatura, item_id)
+    except Exception as exc:
+        log.warning("Error guardando en GCS: %s", exc)
+
+
+@app.get("/api/historial")
+async def listar_historial(_user: dict = Depends(sesion_activa)):
+    if not GCS_BUCKET:
+        return JSONResponse({"grupos": []})
+
+    def _listar():
+        cliente = _gcs.Client()
+        items = []
+        for blob in cliente.list_blobs(GCS_BUCKET, prefix="meta/"):
+            if not blob.name.endswith(".json"):
+                continue
+            try:
+                items.append(json.loads(blob.download_as_text()))
+            except Exception:
+                continue
+        return items
+
+    try:
+        items = await asyncio.to_thread(_listar)
+        grupos: dict = {}
+        for item in sorted(items, key=lambda x: x.get("fecha", ""), reverse=True):
+            asig = item.get("asignatura", "")
+            if asig not in grupos:
+                grupos[asig] = {
+                    "asignatura": asig,
+                    "nombre_asig": item.get("nombre_asig", asig),
+                    "items": [],
+                }
+            grupos[asig]["items"].append(item)
+        return JSONResponse({"grupos": list(grupos.values())})
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.delete("/api/historial/{asignatura}/{item_id}")
+async def eliminar_historial(
+    asignatura: str, item_id: str, _user: dict = Depends(sesion_activa),
+):
+    if not GCS_BUCKET:
+        raise HTTPException(status_code=404, detail="Historial no configurado")
+    try:
+        def _eliminar():
+            bucket = _gcs.Client().bucket(GCS_BUCKET)
+            for path in [f"meta/{asignatura}/{item_id}.json", f"html/{asignatura}/{item_id}.html"]:
+                blob = bucket.blob(path)
+                if blob.exists():
+                    blob.delete()
+        await asyncio.to_thread(_eliminar)
+        log.info("Eliminado de GCS: %s/%s", asignatura, item_id)
+        return JSONResponse({"ok": True})
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/api/historial/{asignatura}/{item_id}")
+async def obtener_html_historial(
+    asignatura: str, item_id: str, _user: dict = Depends(sesion_activa),
+):
+    if not GCS_BUCKET:
+        raise HTTPException(status_code=404, detail="Historial no configurado")
+    try:
+        def _descargar():
+            return _gcs.Client().bucket(GCS_BUCKET).blob(
+                f"html/{asignatura}/{item_id}.html"
+            ).download_as_text()
+        return JSONResponse({"html": await asyncio.to_thread(_descargar)})
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="No encontrado") from exc
 
 
 if __name__ == "__main__":

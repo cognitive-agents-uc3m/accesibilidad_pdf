@@ -39,3 +39,45 @@ Formato:
 
 ### Cronograma
 - Como tabla HTML accesible (ver instrucciones generales de cronograma)
+
+### Conceptos visuales — alternativas no visuales
+Algunas leyes y principios de IU asumen que el estudiante puede ver distancias, tamaños y distribuciones en pantalla. Para cada uno de estos conceptos, añade un bloque `<aside class="alternativa-no-visual">` inmediatamente después del elemento que describe el concepto. El bloque ofrece una vía de comprensión independiente de la visión, sin repetir la definición original. La explicación debe incluir, según aplique: la fórmula matemática del principio, una analogía con experiencias no visuales (teclado Braille, melodía musical, esfuerzo físico, secuencia de pasos), y la aplicación práctica en diseño que justifica el principio.
+
+**Formato obligatorio:**
+
+```html
+<aside class="alternativa-no-visual" aria-label="Alternativa no visual">
+  <p><strong>Alternativa no visual:</strong> [explicación en términos auditivos, táctiles, matemáticos o procedimentales. No uses expresiones como "ver", "mirar" o "notar visualmente".]</p>
+</aside>
+```
+
+**Añade en el `<style>` del documento (dentro de las reglas existentes):**
+
+```css
+aside.alternativa-no-visual { background: #eef4ff; border-left: 4px solid #2563eb; border-radius: 0 0.375rem 0.375rem 0; padding: 0.75rem 1rem; margin: 0.5rem 0 1.25rem; }
+aside.alternativa-no-visual p { margin: 0; font-size: 0.95em; }
+aside.alternativa-no-visual strong { color: #1d4ed8; }
+```
+
+**Ejemplo — Ley de Fitts:**
+
+```html
+<aside class="alternativa-no-visual" aria-label="Alternativa no visual">
+  <p><strong>Alternativa no visual:</strong> La Ley de Fitts se expresa como T = a + b · log₂(1 + D/W), donde T es el tiempo de apuntamiento, D la distancia al objetivo y W su tamaño. A mayor distancia y menor tamaño, más tiempo se tarda en activar el elemento, igual que en un teclado Braille resulta más rápido pulsar teclas centrales y grandes que teclas pequeñas situadas en las esquinas. En diseño de interfaces, este principio justifica que los botones de acción frecuente sean grandes y estén situados cerca del punto de reposo natural del dedo o del cursor (por ejemplo, la esquina inferior de una pantalla táctil).</p>
+</aside>
+```
+
+**Ejemplo — Principio Gestalt de proximidad:**
+
+```html
+<aside class="alternativa-no-visual" aria-label="Alternativa no visual">
+  <p><strong>Alternativa no visual:</strong> El principio de proximidad establece que los elementos situados cerca unos de otros se perciben como un grupo. La analogía sonora: notas musicales tocadas juntas forman un acorde y se perciben como una unidad; tocadas con pausa entre ellas se oyen como frases distintas. En HTML accesible, este principio es la razón de que etiqueta y campo de formulario estén enlazados con <code>&lt;label for&gt;</code>: el lector de pantalla anuncia ambos como una unidad funcional, reproduciendo la misma agrupación que el ojo obtiene por proximidad espacial.</p>
+</aside>
+```
+
+**Aplica el bloque en cada aparición de:**
+- Leyes de interacción con modelos matemáticos: Ley de Fitts, Ley de Hick, Ley de Steering, Ley de Miller
+- Principios Gestalt: proximidad, similitud, cierre, continuidad, figura-fondo, simetría
+- Composición y jerarquía visual: patrones Z y F de lectura, peso visual, alineación, espaciado
+- Uso del color como portador de información: color de estado, contraste cromático, paletas
+- Heurísticos de Nielsen cuya evaluación depende de inspección visual

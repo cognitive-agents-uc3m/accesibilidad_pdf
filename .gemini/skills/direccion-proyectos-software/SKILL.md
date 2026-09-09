@@ -3,8 +3,8 @@ name: direccion-proyectos-software
 description: Convierte PDFs de Dirección de Proyectos de Desarrollo de Software (DPDS) a HTML accesible WCAG 2.2. Úsala para material de DPDS con diagramas de Gantt, gráficas Burndown o Burnup, gestión de riesgos, documentos de entrega o diagramas UML de gestión.
 codigo: DPDS
 nombre: Dirección de Proyectos de Desarrollo de Software
-curso: 3
-cuatrimestre: 2
+curso: 4
+cuatrimestre: 1
 ---
 
 ## INSTRUCCIONES ESPECÍFICAS: DIRECCIÓN DE PROYECTOS DE DESARROLLO DE SOFTWARE

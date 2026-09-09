@@ -222,6 +222,7 @@ def _construir_prompt_filtrado(codigo: str, indices_activos: list[int]) -> str:
 @app.post("/api/check-contradicciones")
 async def check_contradicciones(
     asignatura: str = Form(...),
+    modelo: str = Form(default="gemini-2.5-flash"),
     skills_activos: str = Form(default=""),
     skills_custom: str = Form(default=""),
     user: dict = Depends(sesion_activa),
@@ -256,7 +257,7 @@ async def check_contradicciones(
     prompt = _PROMPT_COMPAT.format(instrucciones="\n\n".join(partes))
     try:
         client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=[prompt])
+        response = client.models.generate_content(model=modelo, contents=[prompt])
         raw = (response.text or "").strip()
         raw = re.sub(r"^```(?:json)?\n?", "", raw)
         raw = re.sub(r"\n?```$", "", raw)

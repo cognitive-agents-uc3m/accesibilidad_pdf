@@ -3,8 +3,8 @@ name: estadistica
 description: Convierte PDFs de Estadística (EST) a HTML accesible WCAG 2.2. Úsala para material de EST con fórmulas estadísticas, tablas de distribuciones (Z, t-Student, chi-cuadrado), código R, histogramas, diagramas de dispersión o de caja.
 codigo: EST
 nombre: Estadística
-curso: 2
-cuatrimestre: 1
+curso: 1
+cuatrimestre: 2
 ---
 
 ## INSTRUCCIONES ESPECÍFICAS: ESTADÍSTICA

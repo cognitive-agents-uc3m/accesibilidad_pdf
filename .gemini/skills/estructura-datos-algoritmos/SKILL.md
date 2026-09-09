@@ -3,8 +3,8 @@ name: estructura-datos-algoritmos
 description: Convierte PDFs de Estructura de Datos y Algoritmos (EDA) a HTML accesible WCAG 2.2. Úsala para material de EDA con listas enlazadas, árboles binarios, pilas, colas, montículos, trazas de ordenación, BFS, DFS o notación O().
 codigo: EDA
 nombre: Estructura de Datos y Algoritmos
-curso: 1
-cuatrimestre: 2
+curso: 2
+cuatrimestre: 1
 ---
 
 ## INSTRUCCIONES ESPECÍFICAS: ESTRUCTURA DE DATOS Y ALGORITMOS

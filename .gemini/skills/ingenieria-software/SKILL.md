@@ -3,7 +3,7 @@ name: ingenieria-software
 description: Convierte PDFs de Ingeniería del Software (IS) a HTML accesible WCAG 2.2. Úsala para material de IS con diagramas UML (clases, secuencia, componentes, despliegue), casos de uso, gestión de configuración o comandos Git y SVN.
 codigo: IS
 nombre: Ingeniería del Software
-curso: 3
+curso: 2
 cuatrimestre: 1
 ---
 

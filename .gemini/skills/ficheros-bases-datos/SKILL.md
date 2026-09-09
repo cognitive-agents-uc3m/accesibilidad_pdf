@@ -3,7 +3,7 @@ name: ficheros-bases-datos
 description: Convierte PDFs de Ficheros y Bases de Datos (FFBBDD) a HTML accesible WCAG 2.2. Úsala para material de FFBBDD con esquemas relacionales, diagramas ER, SQL, normalización (1FN, 2FN, 3FN), entidades débiles o vídeos con marcas de tiempo.
 codigo: FFBBDD
 nombre: Ficheros y Bases de Datos
-curso: 2
+curso: 3
 cuatrimestre: 2
 ---
 

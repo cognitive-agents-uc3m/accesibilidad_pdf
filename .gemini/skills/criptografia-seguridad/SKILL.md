@@ -3,8 +3,8 @@ name: criptografia-seguridad
 description: Convierte PDFs de Criptografía y Seguridad Informática (CSI) a HTML accesible WCAG 2.2. Úsala para material de CSI con algoritmos criptográficos (AES, RSA, DES), aritmética modular, protocolos TLS o PKI, flujos de mensajes o valores hash.
 codigo: CSI
 nombre: Criptografía y Seguridad Informática
-curso: 2
-cuatrimestre: 2
+curso: 3
+cuatrimestre: 1
 ---
 
 ## INSTRUCCIONES ESPECÍFICAS: CRIPTOGRAFÍA Y SEGURIDAD INFORMÁTICA

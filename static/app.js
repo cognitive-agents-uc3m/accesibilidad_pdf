@@ -155,6 +155,7 @@ btnVerificarCompat.addEventListener('click', async () => {
   try {
     const fd = new FormData();
     fd.append('asignatura', selectAsignatura.value);
+    fd.append('modelo', document.getElementById('modelo').value);
     const activos = obtenerSkillsActivos();
     if (activos !== null) fd.append('skills_activos', JSON.stringify(activos));
     const custom = obtenerSkillsCustomActivos();

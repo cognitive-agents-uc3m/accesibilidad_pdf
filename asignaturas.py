@@ -54,6 +54,8 @@ Reglas de estructura:
       <h2 id="id-del-h2">Título de la sección</h2>
     </section>
 - Jerarquía de encabezados sin saltos (h1 > h2 > h3, nunca h1 → h3).
+- TODOS los <h2> y <h3> llevan un atributo id único y descriptivo \
+  (por ejemplo id="estimacion-puntual"), aunque no estén dentro de una <section>.
 - El texto de cada encabezado debe describir el contenido de su sección. \
   Encabezados genéricos como "Continuación", "Más información" u "Otros" están PROHIBIDOS: \
   usa un resumen breve del contenido en su lugar.
@@ -83,6 +85,8 @@ Reglas de estructura:
 </secuencia>
 
 <navegacion>
+- NO generes un índice de navegación propio al principio del documento: \
+  se añade automáticamente a partir de los encabezados h2 y h3.
 - Si el documento incluye un índice o tabla de contenidos, cada entrada activa o \
   destacada lleva aria-current="true". Las entradas son <li> dentro de <nav> o <ul>.
 - Usa <aside> SOLO para contenido genuinamente complementario (notas al margen, \

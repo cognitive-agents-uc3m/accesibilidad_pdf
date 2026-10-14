@@ -4,9 +4,12 @@ import logging
 import os
 import re
 import tempfile
+import unicodedata
 import uuid as _uuid
 from datetime import datetime, timezone
+from html import escape
 
+from bs4 import BeautifulSoup
 from google.cloud import storage as _gcs
 
 from dotenv import load_dotenv
@@ -305,6 +308,159 @@ def _limpiar_html(texto: str) -> str:
     return texto.strip()
 
 
+# ── Índice de navegación ──────────────────────────────────────────────────────
+
+ID_INDICE = "indice-navegacion"
+TITULO_INDICE = "Índice de contenidos"
+_RE_NUMERACION = re.compile(r"^\d+(?:\.\d+)*\.?(?=\s)")
+_RE_ENCABEZADO = re.compile(r"<h([23])\b([^>]*)>(.*?)</h\1\s*>", re.IGNORECASE | re.DOTALL)
+_RE_ID = re.compile(r"""(?<![\w-])id\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+_RE_APERTURA_BLOQUE = re.compile(r"<(nav|section|div|aside)\b", re.IGNORECASE)
+_RE_ENLACE_INTERNO = re.compile(
+    r"""<a\b[^>]*href\s*=\s*["']#[^>]*>(.*?)</a\s*>""", re.IGNORECASE | re.DOTALL
+)
+_RE_CUALQUIER_ENCABEZADO = re.compile(r"<h[1-6]\b.*?</h[1-6]\s*>", re.IGNORECASE | re.DOTALL)
+_MARCA_INDICE = "<!--indice-navegacion-->"
+
+
+def _slug(texto: str) -> str:
+    s = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    return s[:60].rstrip("-") or "seccion"
+
+
+def _texto_plano(fragmento: str) -> str:
+    return " ".join(BeautifulSoup(fragmento, "html.parser").get_text().split())
+
+
+def _bloques_indice(html: str) -> list[tuple[int, int]]:
+    """Posiciones de los bloques que son un índice (el del PDF, que Gemini reproduce).
+
+    Gemini no usa siempre la misma etiqueta, así que se decide por contenido:
+    un <nav> con 2+ enlaces internos, o un <section>/<div>/<aside> cuyo texto
+    (sin contar encabezados) sea casi todo enlaces internos.
+    """
+    tramos: list[tuple[int, int]] = []
+    for apertura in _RE_APERTURA_BLOQUE.finditer(html):
+        if tramos and apertura.start() < tramos[-1][1]:
+            continue
+        etiqueta = apertura.group(1).lower()
+        m = re.compile(rf"<{etiqueta}\b[^>]*>(.*?)</{etiqueta}\s*>", re.IGNORECASE | re.DOTALL
+                       ).match(html, apertura.start())
+        # Si hay un bloque igual anidado, el cierre encontrado no sería el suyo.
+        if not m or re.search(rf"<{etiqueta}\b", m.group(1), re.IGNORECASE):
+            continue
+        enlaces = _RE_ENLACE_INTERNO.findall(m.group(1))
+        if len(enlaces) < 2:
+            continue
+        if etiqueta != "nav":
+            texto = _texto_plano(_RE_CUALQUIER_ENCABEZADO.sub("", m.group(1)))
+            texto_enlaces = _texto_plano(" ".join(enlaces))
+            if not texto or len(texto_enlaces) / len(texto) < 0.8:
+                continue
+        tramos.append(m.span())
+    return tramos
+
+
+def _insertar_indice(html: str) -> str:
+    """Inserta un <nav> con enlaces a todos los h2/h3 del documento.
+
+    Si Gemini ya reprodujo el índice del PDF (ver _bloques_indice), se
+    sustituye por este en la misma posición; si no, va tras el <h1>.
+    Los encabezados sin id reciben uno. Se trabaja sobre el texto (no se
+    reserializa con BeautifulSoup) para no alterar el resto del HTML.
+    """
+    if f'id="{ID_INDICE}"' in html:
+        return html
+
+    previo = None
+    tramos = _bloques_indice(html)
+    if tramos:
+        ini, fin = tramos[0]
+        previo = html[ini:fin]
+        html = html[:ini] + _MARCA_INDICE + html[fin:]
+
+    # Los encabezados de otros índices (diapositivas de índice repetidas) no son secciones.
+    tramos_nav = _bloques_indice(html)
+    ids_usados = set(_RE_ID.findall(html))
+    entradas: list[tuple[int, str, str]] = []  # (nivel, id, texto)
+
+    def _registrar(m: re.Match) -> str:
+        if any(ini <= m.start() < fin for ini, fin in tramos_nav):
+            return m.group(0)
+        nivel, attrs, contenido = m.group(1), m.group(2), m.group(3)
+        texto = _texto_plano(contenido)
+        if not texto:
+            return m.group(0)
+        id_existente = _RE_ID.search(attrs)
+        if id_existente:
+            entradas.append((int(nivel), id_existente.group(1), texto))
+            return m.group(0)
+        base = _slug(texto)
+        nuevo_id, n = base, 2
+        while nuevo_id in ids_usados:
+            nuevo_id, n = f"{base}-{n}", n + 1
+        ids_usados.add(nuevo_id)
+        entradas.append((int(nivel), nuevo_id, texto))
+        return f'<h{nivel} id="{nuevo_id}"{attrs}>{contenido}</h{nivel}>'
+
+    html = _RE_ENCABEZADO.sub(_registrar, html)
+    if not entradas:
+        return html.replace(_MARCA_INDICE, previo) if previo else html
+
+    # Los h3 cuelgan del h2 anterior; un h3 sin h2 previo va al primer nivel.
+    arbol: list[tuple[tuple[str, str], list[tuple[str, str]]]] = []
+    for nivel, id_, texto in entradas:
+        if nivel == 3 and arbol:
+            arbol[-1][1].append((id_, texto))
+        else:
+            arbol.append(((id_, texto), []))
+
+    # La numeración va en el texto del enlace (4.1, 4.2…) y no en un <ol>, porque
+    # en listas anidadas el lector de pantalla anuncia 1, 2… sin el apartado padre.
+    def _numero_propio(texto: str) -> str | None:
+        m = _RE_NUMERACION.match(texto)
+        return m.group(0).rstrip(".") if m else None
+
+    def _enlace(id_: str, texto: str, numero: str | None) -> str:
+        etiqueta = f"{numero}. {texto}" if numero else texto
+        return f'<a href="#{escape(id_)}">{escape(etiqueta)}</a>'
+
+    # Si algún apartado ya trae número propio, no se numeran los que no lo tienen
+    # para no mezclar la numeración del documento con una inventada.
+    numerar_raiz = not any(_numero_propio(texto) for (_, texto), _ in arbol)
+
+    items = []
+    for i, ((id_, texto), hijos) in enumerate(arbol, 1):
+        propio = _numero_propio(texto)
+        numero_padre = propio or (str(i) if numerar_raiz else None)
+        sub = ""
+        if hijos:
+            lineas = []
+            for j, (id_hijo, texto_hijo) in enumerate(hijos, 1):
+                generado = None
+                if numero_padre and not _numero_propio(texto_hijo):
+                    generado = f"{numero_padre}.{j}"
+                lineas.append(f"<li>{_enlace(id_hijo, texto_hijo, generado)}</li>")
+            sub = "\n<ul>\n" + "\n".join(lineas) + "\n</ul>\n"
+        items.append(f"<li>{_enlace(id_, texto, None if propio else numero_padre)}{sub}</li>")
+
+    nav = (
+        f'\n<nav class="indice-navegacion" aria-labelledby="{ID_INDICE}">\n'
+        "<details>\n"
+        f'<summary id="{ID_INDICE}">{TITULO_INDICE}</summary>\n'
+        "<ul>\n" + "\n".join(items) + "\n</ul>\n</details>\n</nav>\n"
+    )
+
+    if previo:
+        return html.replace(_MARCA_INDICE, nav.strip(), 1)
+    for patron in (r"</h1\s*>", r"<main\b[^>]*>", r"<body\b[^>]*>"):
+        m = re.search(patron, html, re.IGNORECASE)
+        if m:
+            return html[:m.end()] + nav + html[m.end():]
+    return nav + html
+
+
 @app.post("/api/convertir")
 async def convertir(
     pdf: UploadFile = File(...),
@@ -391,7 +547,7 @@ async def convertir(
             log.warning("No se pudo extraer el uso de tokens: %s", e)
         # -----------------------------------------
 
-        html = _limpiar_html(response.text or "")
+        html = _insertar_indice(_limpiar_html(response.text or ""))
         log.info("✓ HTML generado — %d chars", len(html))
 
         await asyncio.to_thread(
